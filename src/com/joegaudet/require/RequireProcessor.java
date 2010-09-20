@@ -7,9 +7,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,7 +70,7 @@ public class RequireProcessor {
 	 * @param appName
 	 */
 	public RequireProcessor(String path, String appName){
-		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*.*extend");
+		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*[ [.*\\.extend] | [{] ]+");
 		this.usagePattern = Pattern.compile(appName + "\\.([A-Za-z]+)");
 		this.filePattern = Pattern.compile(path + "/*(.+).js$");
 		
@@ -113,7 +114,7 @@ public class RequireProcessor {
 					BufferedReader reader = new BufferedReader(new FileReader(file));
 					String nextLine;
 					StringBuilder newFileBuilder = new StringBuilder();
-					ArrayList<String> requires = new ArrayList<String>();
+					Set<String> requires = new TreeSet<String>();
 					while((nextLine = reader.readLine()) != null){
 						if(guardAgainstRepeats(nextLine)){
 							// comments
@@ -213,6 +214,9 @@ public class RequireProcessor {
 		retval &= !nextLine.contains("// Project:");
 		retval &= !nextLine.contains("// Copyright:");
 		retval &= !nextLine.contains("/*globals");
+		
+		// let these ones through
+		retval |= nextLine.contains("sc_require('core')");
 		retval |=  annotationPattern.matcher(nextLine).find();
 		return retval;
 
@@ -240,7 +244,8 @@ public class RequireProcessor {
 	 * @throws IOException 
 	 */
 	private void processFile(File file, SproutCoreFileHandler handler) {
-		if(file.getName().endsWith(".js")){
+		// ignore core.js
+		if(!file.getName().equals("core.js") && file.getName().endsWith(".js")){
 			handler.handleFile(file);
 		}
 	}
@@ -267,6 +272,11 @@ public class RequireProcessor {
 		else {
 			new RequireProcessor(args[0], args[1]).parse();
 		}
+		
+//		Matcher matcher = Pattern.compile("DarkHorse\\.([A-Za-z]+)").matcher("DarkHorse.CommentsView = SC.View.extend(DarkHorse.MatygoView, DarkHorse.NavigationBuilder");
+//		while(matcher.find()){
+//			System.out.println(matcher.group(1));
+//		}
 	}
 	
 }
