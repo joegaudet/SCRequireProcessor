@@ -1,0 +1,23 @@
+SCRequireProcessor:
+
+Refactoring Sproutcore folders and files is a major pain, since the sc_require calls don't get automatically updated.
+
+I wrote this Java class (It's jared as well), to help rectify this problem.
+
+It basically walks your SC app folder looking for declarations like the following
+
+MyApp.<something> = <SomethingElse>.extend({});
+
+It then performs a second pass looking for uses of any kind and prepends the appropriate sc_requires.
+
+It also lops off the licence description (provided you are using the default one) and inserts your custom one.
+
+Right now the replacement one is hard coded, so you'll have to change that and jar this up your self (or simply run it with Java). If there is
+sufficient interest I will extend it to allow you to specify the licence to be inserted in a file.
+
+Let me know how you like it
+
+.joe (joe@joegaudet.com)
+
+
+USAGE: java -jar SCRequireProcessor path/to/your/app YouAppName
