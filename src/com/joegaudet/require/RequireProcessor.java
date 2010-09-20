@@ -70,7 +70,7 @@ public class RequireProcessor {
 	 * @param appName
 	 */
 	public RequireProcessor(String path, String appName){
-		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*[ [.*\\.extend] | [{] ]+");
+		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*([A-Za-z\\.]+(design|extend|SC.mixin)|function|\\{|SC\\.mixin)");
 		this.usagePattern = Pattern.compile(appName + "\\.([A-Za-z]+)");
 		this.filePattern = Pattern.compile(path + "/*(.+).js$");
 		
