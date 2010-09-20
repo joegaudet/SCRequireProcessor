@@ -42,6 +42,11 @@ public class RequireProcessor {
 	 */
 	private Pattern usagePattern;
 
+	/** 
+	 * The pattern user to identify requires that should be managed mannually
+	 */
+	private Pattern annotationPattern;
+	
 	/**
 	 * Map that contains which files have the definitions for which SC classes
 	 */
@@ -67,6 +72,8 @@ public class RequireProcessor {
 		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*.*extend");
 		this.usagePattern = Pattern.compile(appName + "\\.([A-Za-z]+)");
 		this.filePattern = Pattern.compile(path + "/*(.+).js$");
+		
+		this.annotationPattern = Pattern.compile("/\\*.*@ignore.*\\*/\\s*sc_require");
 		
 		this.path = path;
 		this.fileMap = new HashMap<String,String>();
@@ -108,7 +115,7 @@ public class RequireProcessor {
 					StringBuilder newFileBuilder = new StringBuilder();
 					ArrayList<String> requires = new ArrayList<String>();
 					while((nextLine = reader.readLine()) != null){
-						if(!guardAgainstRepeats(nextLine)){
+						if(guardAgainstRepeats(nextLine)){
 							// comments
 							if(nextLine.length() > 0 && nextLine.charAt(0) != '/'){
 								Matcher matcher = usagePattern.matcher(nextLine);
@@ -157,6 +164,7 @@ public class RequireProcessor {
 		if(!root.getParentFile().getName().equals("apps")){
 			System.err.println("You have not pointed SCRequireProcessor at the right directory.");
 			System.err.println("The parent directory should be apps");
+			return;
 		}
 		
 		if(!root.exists() || !root.isDirectory()){
@@ -205,7 +213,8 @@ public class RequireProcessor {
 		retval &= !nextLine.contains("// Project:");
 		retval &= !nextLine.contains("// Copyright:");
 		retval &= !nextLine.contains("/*globals");
-		return !retval;
+		retval |=  annotationPattern.matcher(nextLine).find();
+		return retval;
 
 	}
 
@@ -245,7 +254,6 @@ public class RequireProcessor {
 	private interface SproutCoreFileHandler {
 		public void handleFile(File file);
 	}
-	
 	
 	/**
 	 * 

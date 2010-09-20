@@ -17,7 +17,12 @@ sufficient interest I will extend it to allow you to specify the licence to be i
 
 Let me know how you like it
 
-.joe (joe@joegaudet.com)
+UPDATE:
 
+If you have a require that isn't based on standard SC usage, you may now annotate it, and it will be ignored by the processor
+
+/* @ignore */ sc_require('manage/me/manually');
+
+.joe (joe@joegaudet.com)
 
 USAGE: java -jar SCRequireProcessor path/to/your/app YouAppName
