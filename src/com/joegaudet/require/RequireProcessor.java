@@ -13,6 +13,11 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * RequireParser - a simple class for parsing through a SproutCore app and
+ * identifying the requires likely needed for the app to work properly
+ * @author Joe Gaudet - joe@joegaudet.com
+ */
 public class RequireProcessor {
 
 	/**
@@ -61,7 +66,7 @@ public class RequireProcessor {
 	public RequireProcessor(String path, String appName){
 		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*.*extend");
 		this.usagePattern = Pattern.compile(appName + "\\.([A-Za-z]+)");
-		this.filePattern = Pattern.compile(path + "/*(.+).js");
+		this.filePattern = Pattern.compile(path + "/*(.+).js$");
 		
 		this.path = path;
 		this.fileMap = new HashMap<String,String>();
@@ -132,7 +137,6 @@ public class RequireProcessor {
 					
 					finalBuilder.append(newFileBuilder.toString());
 					
-					
 					FileChannel channel = new FileOutputStream(file).getChannel();
 					channel.write(ByteBuffer.wrap(finalBuilder.toString().getBytes()));
 					channel.close();
@@ -149,6 +153,12 @@ public class RequireProcessor {
 	 */
 	public void parse() throws IOException{
 		File root = new File(path);
+		
+		if(!root.getParentFile().getName().equals("apps")){
+			System.err.println("You have not pointed SCRequireProcessor at the right directory.");
+			System.err.println("The parent directory should be apps");
+		}
+		
 		if(!root.exists() || !root.isDirectory()){
 			System.err.println("Expected an actual directory at the root");
 		}
@@ -221,7 +231,7 @@ public class RequireProcessor {
 	 * @throws IOException 
 	 */
 	private void processFile(File file, SproutCoreFileHandler handler) {
-		if(file.getName().contains(".js")){
+		if(file.getName().endsWith(".js")){
 			handler.handleFile(file);
 		}
 	}
@@ -229,7 +239,7 @@ public class RequireProcessor {
 	/**
 	 * Generic interface to allow the file tree to be walked 
 	 * with a different strategy each time.
-	 * @author Joe Gaudet - joe@matygo.com
+	 * @author Joe Gaudet - joe@joegaudet.com
 	 *
 	 */
 	private interface SproutCoreFileHandler {
