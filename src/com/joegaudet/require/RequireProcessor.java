@@ -7,9 +7,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +48,10 @@ public class RequireProcessor {
 	 */
 	private Pattern annotationPattern;
 	
+	private Pattern openBrace = Pattern.compile("(\\{)");
+	
+	private Pattern closeBrace = Pattern.compile("(\\})");
+	
 	/**
 	 * Map that contains which files have the definitions for which SC classes
 	 */
@@ -71,13 +75,13 @@ public class RequireProcessor {
 	 */
 	public RequireProcessor(String path, String appName){
 		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*([A-Za-z\\.]+(design|extend|SC.mixin)|function|\\{|SC\\.mixin)");
-		this.usagePattern = Pattern.compile(appName + "\\.([A-Za-z]+)");
+		this.usagePattern = Pattern.compile("(^|[^'\"])" + appName + "\\.([A-Za-z]+)\\.?(\\w*)");
 		this.filePattern = Pattern.compile(path + "/*(.+).js$");
 		
 		this.annotationPattern = Pattern.compile("/\\*.*@ignore.*\\*/\\s*sc_require");
 		
 		this.path = path;
-		this.fileMap = new HashMap<String,String>();
+		this.fileMap = new TreeMap<String,String>();
 		
 		initHandlers();
 	}
@@ -115,20 +119,42 @@ public class RequireProcessor {
 					String nextLine;
 					StringBuilder newFileBuilder = new StringBuilder();
 					Set<String> requires = new TreeSet<String>();
+					System.out.println();
+					System.out.println(file.getPath());
+					boolean inFunction = false;
+					int count = 0;
 					while((nextLine = reader.readLine()) != null){
+						
+						if(nextLine.contains("function")){
+//							functionStack.push(0);
+							inFunction = true;
+						}
+						
+						
+						if(inFunction){
+							Matcher openMatcher = openBrace.matcher(nextLine);
+							Matcher closeMatcher = closeBrace.matcher(nextLine);
+							while(openMatcher.find())
+								count++;
+							
+							while(closeMatcher.find())
+								count--;
+							if(count == 0)
+								inFunction = false;
+						}
+						
 						if(guardAgainstRepeats(nextLine)){
 							// comments
-							if(nextLine.length() > 0 && nextLine.charAt(0) != '/'){
+							if(!inFunction && nextLine.length() > 0 && nextLine.charAt(0) != '/'){
 								Matcher matcher = usagePattern.matcher(nextLine);
 								while(matcher.find()){
-									for(int i = 1; i < matcher.groupCount() + 1; i++){
-										String requireFile = fileMap.get(matcher.group(1));
-
-										// guard against circular definitions
-										if(requireFile != null && !file.getPath().equals(path + File.separatorChar + requireFile + ".js")){
-											String require = "sc_require('" + requireFile + "');\n";
-											requires.add(require);
-										}
+									System.out.println("\tUsage: " + matcher.group(2) + " in " + nextLine.replace(" ", "").replace("\t", ""));
+									String requireFile = fileMap.get(matcher.group(2));
+									// guard against circular definitions
+									if(requireFile != null && !file.getPath().equals(path + File.separatorChar + requireFile + ".js")){
+										String require = "sc_require('" + requireFile + "');\n";
+										requires.add(require);
+										System.out.println("\t\t Requiring: " + requireFile);
 									}
 								}
 							}
@@ -178,8 +204,12 @@ public class RequireProcessor {
 			System.out.println("Execution: " + (System.currentTimeMillis() - time));
 			
 			System.out.println("Found Definitions");
-			for(String key: fileMap.keySet())
-				System.out.println(key);
+			for(String key: fileMap.keySet()){
+				String fileName = fileMap.get(key);
+				while(fileName.length() < 60)
+					fileName += " ";
+				System.out.println("File:" + fileName + "\tdefines: " + key);
+			}
 			
 			System.out.println("Scanning for usage");
 			long time3 = System.currentTimeMillis();
@@ -196,7 +226,7 @@ public class RequireProcessor {
 		StringBuilder builder = new StringBuilder();
 		builder.append("// ==========================================================================\n");
 		builder.append("// Project:   DarkHorse - The PC Browser targeted face of the Matygo Web App\n");
-		builder.append("// Copyright: ©2010 Matygo Educational Incorporated\n");
+		builder.append("// Copyright: 2010 Matygo Educational Incorporated\n");
 		builder.append("// ==========================================================================\n");
 		builder.append("/*globals DarkHorse SCUI */\n");
 		return builder.toString();
@@ -273,9 +303,11 @@ public class RequireProcessor {
 			new RequireProcessor(args[0], args[1]).parse();
 		}
 		
-//		Matcher matcher = Pattern.compile("DarkHorse\\.([A-Za-z]+)").matcher("DarkHorse.CommentsView = SC.View.extend(DarkHorse.MatygoView, DarkHorse.NavigationBuilder");
+//		String nextLine = "DarkHorse.CommentsView= { SC.View.extend(DarkHorse.MatygoView, DarkHorse.NavigationBuilder.create,'DarkHorse.NavigationBuilder',{";
+//		
+//		Matcher matcher = Pattern.compile("(\\{)").matcher(nextLine);
 //		while(matcher.find()){
-//			System.out.println(matcher.group(1));
+//			
 //		}
 	}
 	
