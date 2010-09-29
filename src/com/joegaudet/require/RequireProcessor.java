@@ -2,6 +2,7 @@ package com.joegaudet.require;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -66,25 +67,33 @@ public class RequireProcessor {
 	 * The handler used when parsing for usage
 	 */
 	private SproutCoreFileHandler usageHandler;
+
+	private File root;
+
+	private File outputRoot;
+	
+	private boolean verbose = false;
+
 	
 	/**
 	 * RequireParser - a simple class for parsing through a SproutCore app and
 	 * identifying the requires likely needed for the app to work properly
 	 * @param path
 	 * @param appName
+	 * @param verbose2 
 	 */
-	public RequireProcessor(String path, String appName){
+	public RequireProcessor(String path, String appName, boolean verbose){
 		this.definitiondefinition = Pattern.compile(appName + "\\.(\\w+)\\s*=\\s*([A-Za-z\\.]+(design|extend|SC.mixin)|function|\\{|SC\\.mixin)");
 		this.usagePattern = Pattern.compile("(^|[^'\"])" + appName + "\\.([A-Za-z]+)\\.?(\\w*)");
 		this.filePattern = Pattern.compile(path + "/*(.+).js$");
-		
 		this.annotationPattern = Pattern.compile("/\\*.*@ignore.*\\*/\\s*sc_require");
 		
+		this.verbose = verbose;
 		this.path = path;
 		this.fileMap = new TreeMap<String,String>();
-		
 		initHandlers();
 	}
+	
 
 	/**
 	 * Initializes the file handlers
@@ -119,8 +128,8 @@ public class RequireProcessor {
 					String nextLine;
 					StringBuilder newFileBuilder = new StringBuilder();
 					Set<String> requires = new TreeSet<String>();
-					System.out.println();
-					System.out.println(file.getPath());
+					if(verbose) System.out.println();
+					if(verbose) System.out.println(file.getPath());
 					boolean inFunction = false;
 					int count = 0;
 					while((nextLine = reader.readLine()) != null){
@@ -148,13 +157,13 @@ public class RequireProcessor {
 							if(!inFunction && nextLine.length() > 0 && nextLine.charAt(0) != '/'){
 								Matcher matcher = usagePattern.matcher(nextLine);
 								while(matcher.find()){
-									System.out.println("\tUsage: " + matcher.group(2) + " in " + nextLine.replace(" ", "").replace("\t", ""));
+									if(verbose) System.out.println("\tUsage: " + matcher.group(2) + " in " + nextLine.replace(" ", "").replace("\t", ""));
 									String requireFile = fileMap.get(matcher.group(2));
 									// guard against circular definitions
 									if(requireFile != null && !file.getPath().equals(path + File.separatorChar + requireFile + ".js")){
 										String require = "sc_require('" + requireFile + "');\n";
 										requires.add(require);
-										System.out.println("\t\t Requiring: " + requireFile);
+										if(verbose) System.out.println("\t\t Requiring: " + requireFile);
 									}
 								}
 							}
@@ -170,10 +179,19 @@ public class RequireProcessor {
 						finalBuilder.append(require);
 					
 					finalBuilder.append(newFileBuilder.toString());
+//					Matcher matcher = pathPattern.matcher(file.getPath());
+//					matcher.find();
+
+//					File outputFile = new File(outputRoot.getAbsolutePath() + matcher.group(1));
+//					outputFile.getParentFile().mkdirs();
+//					outputFile.createNewFile();
 					
+//					System.out.println(outputFile.getAbsolutePath());
+//					if(outputFile.exists()){
 					FileChannel channel = new FileOutputStream(file).getChannel();
 					channel.write(ByteBuffer.wrap(finalBuilder.toString().getBytes()));
 					channel.close();
+//					}
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -186,7 +204,9 @@ public class RequireProcessor {
 	 * @throws IOException - thrown if for some reason the files doesn't really exist, or a read protected 
 	 */
 	public void parse() throws IOException{
-		File root = new File(path);
+		this.root = new File(path);
+		this.outputRoot = new File(root.getParentFile().getAbsolutePath() + File.separatorChar + "tmp");
+		this.outputRoot.mkdir();
 		
 		if(!root.getParentFile().getName().equals("apps")){
 			System.err.println("You have not pointed SCRequireProcessor at the right directory.");
@@ -201,20 +221,23 @@ public class RequireProcessor {
 			System.out.println("Scanning for definitions");
 			long time = System.currentTimeMillis();
 			processDirectory(root, definitionsHandler);
-			System.out.println("Execution: " + (System.currentTimeMillis() - time));
+			if(verbose) System.out.println("Execution: " + (System.currentTimeMillis() - time));
 			
-			System.out.println("Found Definitions");
+			if(verbose) System.out.println("Found Definitions");
 			for(String key: fileMap.keySet()){
 				String fileName = fileMap.get(key);
 				while(fileName.length() < 60)
 					fileName += " ";
-				System.out.println("File:" + fileName + "\tdefines: " + key);
+				if(verbose) System.out.println("File:" + fileName + "\tdefines: " + key);
 			}
-			
+			System.out.println("Done.");
 			System.out.println("Scanning for usage");
+			
 			long time3 = System.currentTimeMillis();
 			processDirectory(root, usageHandler);
-			System.out.println("Execution: " + (System.currentTimeMillis() - time3));
+			if(verbose) System.out.println("Execution: " + (System.currentTimeMillis() - time3));
+//			this.delete(outputRoot);
+			System.out.println("Done.");
 		}
 	}
 	
@@ -296,11 +319,13 @@ public class RequireProcessor {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-		if(args.length != 2){
+		if(args.length < 2){
 			System.err.println("USAGE: java -jar SCRequireProcessor <appDirectory> <appName>");
 		}
 		else {
-			new RequireProcessor(args[0], args[1]).parse();
+			File file = new File(args[0]);
+			boolean verbose = args.length == 3;
+			new RequireProcessor(file.getAbsolutePath(), args[1], verbose).parse();
 		}
 		
 //		String nextLine = "DarkHorse.CommentsView= { SC.View.extend(DarkHorse.MatygoView, DarkHorse.NavigationBuilder.create,'DarkHorse.NavigationBuilder',{";
@@ -311,4 +336,11 @@ public class RequireProcessor {
 //		}
 	}
 	
+	public void delete(File f) throws IOException {
+		if (f.isDirectory()) {
+			for (File c : f.listFiles())
+				delete(c);
+		}
+		if (!f.delete()) throw new FileNotFoundException("Failed to delete file: " + f);
+	}
 }
